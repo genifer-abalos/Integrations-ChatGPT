@@ -30,34 +30,18 @@ ssl_context2.verify_mode = ssl.CERT_NONE
 
 
 client = slack.WebClient(os.environ['SLACK_BOT_TOKEN'], ssl=ssl_context2)
-# slack_app = App(token=os.environ['SLACK_API_TOKEN'])
 openai.api_key = os.environ['CHATGPT_API_KEY']
 
-channel_url = "https://hooks.slack.com/services/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"
-
-'''webhook = WebhookClient(channel_url, ssl=ssl_context)
-response = webhook.send(
-    text="fallback",
-    blocks=[
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "You have a new request:\n*<fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>*"
-            }
-        }
-    ]
-)'''
 
 t = time.localtime()
 current_time = time.strftime("%H:%M:%S", t)
+client.chat_postMessage(channel="#chatgpt-convo", text="Python app initiated for Slack Bot at "
+                       "" + str(date.today()) + " " + str(current_time) + ". " +
+                       "Start your message with @ChatGPT then type your message/question")
 
-# client.chat_postMessage(channel="#chatgpt-convo", text="Hi!")
-client.chat_postMessage(channel="#chatgpt-convo", text="The current date is " + str(date.today()) + " " + str(current_time))
 
-
-def get_chatgpt_response(the_prompt):
-    response = openai.Completion.create(
+def get_chatgpt_response(the_prompt, thread_ts):
+    chatgpt_response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=the_prompt,
         max_tokens=1024,
@@ -65,9 +49,41 @@ def get_chatgpt_response(the_prompt):
         stop=None,
         temperature=0.5).choices[0].text
 
-    # Reply to thread
-    response = client.chat_postMessage(channel="#chatgpt-convo", text=f"Here you go: \n{response}")
-    print(response.data)
+    print(chatgpt_response)
+
+    # Reply as a new message
+    # response = client.chat_postMessage(channel="#chatgpt-convo", text=f"Here you go: \n{response}")
+
+    # This is used if you needto specify the channel url webhook instead of the channel name
+    # webhook = WebhookClient(os.environ['CHANNEL_URL_CHATGPT_CONVO'], ssl=ssl_context)
+
+    # Reply to the message/event thread
+    response = client.chat_postMessage(
+        channel="#chatgpt-convo",
+        text=chatgpt_response,
+        # thread_ts="1561764011.015500"
+        thread_ts=thread_ts,
+    )
+
+    print(response.status_code)
+
+
+def create_ticket_from_mentions():
+    pass
+    # Idea: If the user mentions @Tech, we will create a ticket for them
+    # Reply with a section and link
+    # response = webhook.send(
+    #     text="fallback",
+    #     blocks=[
+    #         {
+    #             "type": "section",
+    #             "text": {
+    #                 "type": "mrkdwn",
+    #                 "text": "You have a new request:\n*<link.com>|Genifer Abalos - New ticket request>*"
+    #             }
+    #         }
+    #     ]
+    # )
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -87,7 +103,8 @@ def slack_app():
     print(f"{request_body = }")
 
     prompt = json.loads(request_body)['event']['text']
-    get_chatgpt_response(the_prompt=prompt)
+    thread_ts = json.loads(request_body)["event"]["ts"]
+    get_chatgpt_response(the_prompt=prompt, thread_ts=thread_ts)
 
     return request_body
 
@@ -99,9 +116,5 @@ if __name__ == '__main__':
     # Fetch ChatGPT response
     # Post response to slack channel and thread
 
-    # SocketModeHandler(slack_app, os.environ['SLACK_API_TOKEN']).start()
-
     app.run(debug=True, port=8081)
 
-    prompt = "What are some cool python projects?"
-    # get_chatgpt_response(the_prompt=prompt)
